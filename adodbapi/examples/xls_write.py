@@ -30,4 +30,4 @@ with conn: # will auto commit if no errors
         crsr.execute(sql, data)  # write the first row of data
         crsr.execute(sql, ['John Jones', 'Pvt', 987654321, 140.0, datetime.date(1921,7,4)])  # another row of data
 conn.close()
-print('Created spreadsheet=%s worksheet=%s' % (filename, 'SheetOne'))
+print(('Created spreadsheet=%s worksheet=%s' % (filename, 'SheetOne')))

@@ -64,8 +64,8 @@ if verbose:
     print(version)
 
 # --- define objects to smooth out Python3 <-> Python 2.x differences
-unicodeType = unicode  #this line will be altered by 2to3.py to '= str'
-longType = long        #this line will be altered by 2to3.py to '= int'
+unicodeType = str  #this line will be altered by 2to3.py to '= str'
+longType = int        #this line will be altered by 2to3.py to '= int'
 if sys.version[0] >= '3': #python 3.x
     StringTypes = str
     makeByteBuffer = bytes
@@ -78,7 +78,7 @@ else:                   #python 2.x
         bytes
     except NameError:
         bytes = str
-    StringTypes = (str,unicode)  # will be messed up by 2to3 but never used
+    StringTypes = (str,str)  # will be messed up by 2to3 but never used
 # -----------------------------------------------------------
 # conversion functions mandated by PEP 249
 Binary = makeByteBuffer # override the function from apibase.py
@@ -155,7 +155,7 @@ def connect(*args, **kwargs): # --> a remote db-api connection object
                 time.sleep(1)
             else:
                 raise api.DatabaseError ('Pyro error creating connection to/thru=%s' % repr(kwargs))
-        except _BaseException, e:
+        except _BaseException as e:
             raise api.DatabaseError('Error creating remote connection to=%s, e=%s, %s' % (repr(kwargs), repr(e),sys.exc_info()[2]))
     return myConn
 
@@ -202,7 +202,7 @@ class Connection(object):
     def connect(self, kwargs, connection_maker):
         self.kwargs = kwargs
         if verbose:
-            print '%s attempting: "%s"' % (version,  repr(kwargs))
+            print('%s attempting: "%s"' % (version,  repr(kwargs)))
         self.proxy = connection_maker
         ##try:
         ret = self.proxy.connect(kwargs)  # ask the server to hook us up
@@ -215,7 +215,7 @@ class Connection(object):
         self.paramstyle = self.getIndexedValue('paramstyle')
         self.timeout = self.getIndexedValue('timeout')
         if verbose:
-            print 'adodbapi.remote New connection at %X' % id(self)
+            print('adodbapi.remote New connection at %X' % id(self))
 
     def _raiseConnectionError(self, errorclass, errorvalue):
         eh = self.errorhandler
@@ -231,13 +231,13 @@ class Connection(object):
         an Error (or subclass) exception will be raised if any operation is attempted with the connection.
         The same applies to all cursor objects trying to use the connection.
         """
-        for crsr in self.cursors.values()[:]:  # copy the list, then close each one
+        for crsr in list(self.cursors.values())[:]:  # copy the list, then close each one
             crsr.close()
         try:
             """close the underlying remote Connection object"""
             self.proxy.close()
             if verbose:
-                print 'adodbapi.remote Closed connection at %X' % id(self)
+                print('adodbapi.remote Closed connection at %X' % id(self))
             object.__delattr__(self, 'proxy')   # future attempts to use closed cursor will be caught by __getattr__
         except Exception:
             pass
@@ -328,7 +328,7 @@ def fixpickle(x):
     if isinstance(x, dict):
         # for 'named' paramstyle user will pass a mapping
         newargs = {}
-        for arg,val in x.items():
+        for arg,val in list(x.items()):
             if isinstance(val, memoryViewType):
                 newval = array.array('B')
                 newval.fromstring(val)
@@ -359,7 +359,7 @@ class Cursor(object):
         connection._i_am_here(self)
         self.recordset_format = api.RS_REMOTE
         if verbose:
-            print '%s New cursor at %X on conn %X' % (version, id(self), id(self.connection))
+            print('%s New cursor at %X on conn %X' % (version, id(self), id(self.connection)))
 
     def prepare(self, operation):
         self.command = operation
@@ -370,7 +370,7 @@ class Cursor(object):
     def __iter__(self):                   # [2.1 Zamarev]
         return iter(self.fetchone, None)  # [2.1 Zamarev]
 
-    def next(self):
+    def __next__(self):
         r = self.fetchone()
         if r:
             return r
@@ -438,7 +438,7 @@ class Cursor(object):
         except AttributeError: pass
         fp = fixpickle(parameters)
         if verbose > 2:
-            print('%s executing "%s" with params=%s' % (version, operation, repr(parameters)))
+            print(('%s executing "%s" with params=%s' % (version, operation, repr(parameters))))
         result = self.proxy.crsr_execute(self.id, operation, fp)
         if result:  # an exception was triggered
             self._raiseCursorError(result[0], result[1])
@@ -453,7 +453,7 @@ class Cursor(object):
         except AttributeError: pass
         sq = [fixpickle(x) for x in seq_of_parameters]
         if verbose > 2:
-            print('%s executemany "%s" with params=%s' % (version, operation, repr(seq_of_parameters)))
+            print(('%s executemany "%s" with params=%s' % (version, operation, repr(seq_of_parameters))))
         self.proxy.crsr_executemany(self.id, operation, sq)
 
     def nextset(self):
@@ -462,7 +462,7 @@ class Cursor(object):
         try: del self.columnNames
         except AttributeError: pass
         if verbose > 2:
-            print('%s nextset' % version)
+            print(('%s nextset' % version))
         return self.proxy.crsr_nextset(self.id)
 
     def callproc(self, procname, parameters=None):
@@ -475,13 +475,13 @@ class Cursor(object):
         except AttributeError: pass
         fp = fixpickle(parameters)
         if verbose > 2:
-            print('%s callproc "%s" with params=%s' % (version, procname, repr(parameters)))
+            print(('%s callproc "%s" with params=%s' % (version, procname, repr(parameters))))
         return self.proxy.crsr_callproc(self.id, procname, fp)
 
     def fetchone(self):
         try:
             f1 = self.proxy.crsr_fetchone(self.id)
-        except _BaseException, e:
+        except _BaseException as e:
             self._raiseCursorError(api.DatabaseError, e)
         else:
             if f1 is None:
@@ -496,7 +496,7 @@ class Cursor(object):
                 return []
             r = api.SQLrows(self.rs, len(self.rs), self)
             return r
-        except Exception, e:
+        except Exception as e:
             self._raiseCursorError(api.DatabaseError, e)
 
     def fetchall(self):
@@ -505,7 +505,7 @@ class Cursor(object):
             if not self.rs:
                 return []
             return api.SQLrows(self.rs, len(self.rs), self)
-        except Exception, e:
+        except Exception as e:
             self._raiseCursorError(api.DatabaseError, e)
 
     def close(self):
@@ -522,7 +522,7 @@ class Cursor(object):
         self.connection = None    #this will make all future method calls on me throw an exception
         self.proxy = None
         if verbose:
-            print 'adodbapi.remote Closed cursor at %X' % id(self)
+            print('adodbapi.remote Closed cursor at %X' % id(self))
 
     def __del__(self):
         try:
